@@ -64,7 +64,9 @@ class CaptureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             model = Path(temp)/'House.igz'; model.touch()
             folder = capture.prepare_texture_folder(model)
-            self.assertEqual(folder,model.parent/'House_twinmotion_sync')
+            # Windows runners can expose TEMP through an 8.3 alias while
+            # prepare_texture_folder returns the canonical long path.
+            self.assertEqual(folder,(model.parent/'House_twinmotion_sync').resolve())
             scene = Scene(); triangle(scene.loose_mesh)
             parent,child,leaf = Group(name='parent'),Group(name='child'),Group(name='leaf')
             parent.material = {'color':(1,0,0)}; child.material = {'color':(0,0,1)}
