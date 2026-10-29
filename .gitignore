@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.venv/
+.test-deps/
+*.exe
+*.dll
+*.rhp
+*.msi
+*.cab
+*.igz
+*.udatasmith
+*.udsmesh
+/artifacts/
+/scratch/
+runtime.json
+installation.json

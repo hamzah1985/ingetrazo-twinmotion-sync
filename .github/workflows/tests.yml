@@ -1,0 +1,27 @@
+name: Portable connector checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  portable:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ingelibre/ingetrazo
+          ref: a369d1ed1bf3567f98045113b6a64df23b8d5f43
+          path: .test-deps/ingetrazo
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r requirements-dev.txt -r .test-deps/ingetrazo/requirements.txt
+      - name: Test against the pinned host API
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          PYTHONUTF8: '1'
+        run: |
+          $env:PYTHONPATH = (Resolve-Path '.test-deps/ingetrazo').Path
+          python -m unittest discover -s tests -v
