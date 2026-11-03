@@ -41,6 +41,39 @@ class Host:
         for callback in self.callbacks: callback()
 
 class CaptureTests(unittest.TestCase):
+    def test_back_face_material_and_orientation(self):
+        scene = Scene(); face = triangle(scene.loose_mesh)
+        face.attrs['color'] = (1, 0, 0)
+        face.attrs['back'] = {'color': (0, 1, 0)}
+        snapshot = capture.capture_scene(scene)
+        materials = {m['id']: m['color'] for m in snapshot['materials']}
+        parts = {materials[o['material_id']]: o for o in snapshot['objects']}
+        self.assertEqual(set(parts), {'#FF0000', '#00FF00'})
+        front, back = parts['#FF0000'], parts['#00FF00']
+        self.assertEqual(back['vertices'], list(reversed(front['vertices'])))
+        for n, opposite in zip(front['normals'], reversed(back['normals'])):
+            for a, b in zip(n, opposite): self.assertAlmostEqual(a, -b)
+        face.attrs['back'] = True
+        self.assertEqual(len(capture.capture_scene(scene)['objects'][0]['triangles']), 2)
+        del face.attrs['back']
+        self.assertEqual(len(capture.capture_scene(scene)['objects'][0]['triangles']), 1)
+
+    def test_back_texture_mapping(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); model = root / 'model.igz'; model.touch()
+            image = QImage(2, 2, QImage.Format_RGB32); image.fill(QColor('green'))
+            source = root / 'back.png'; self.assertTrue(image.save(str(source)))
+            scene = Scene(); face = triangle(scene.loose_mesh)
+            face.attrs['color'] = (1, 0, 0)
+            face.attrs['back'] = {'texture': {'path': str(source), 'sw': 1, 'sh': 1}}
+            snapshot = capture.capture_scene(scene, model, capture.prepare_texture_folder(model))
+            backmat = next(m for m in snapshot['materials'] if m.get('diffuse_map'))
+            part = next(o for o in snapshot['objects'] if o['material_id'] == backmat['id'])
+            self.assertTrue(Path(backmat['diffuse_map']).is_file())
+            self.assertEqual(len(part['uvs']), 3)
+            self.assertGreater(len(set(tuple(uv) for uv in part['uvs'])), 1)
+
     def test_camera_view_transform_and_projection(self):
         import math
         camera=OrbitCamera();camera.aspect=16/9;camera.fov_deg=50

@@ -175,60 +175,70 @@ def capture_scene(scene, document_path=None, texture_folder=None):
         for face in mesh.faces:
             if not scene.entity_visible(face):
                 continue
-            attrs = effective_attrs(face.attrs, paint) or {}
-            rgb = tuple(attrs.get('color') or (1.0, 1.0, 1.0))[:3]
-            color = colors.get(rgb)
-            if color is None:
-                color = '#' + ''.join('%02X' % max(0, min(255, round(float(c)*255))) for c in rgb)
-                colors[rgb] = color
-            texture = attrs.get('texture') or {}
-            texture_path = texture.get('path')
-            diffuse_map = None
-            if texture_path:
-                if not document_path or texture_folder is None:
-                    raise ValueError('Save the model and connect Twinmotion Sync before sending textures.')
-                if texture_path not in cached:
-                    try:
-                        cached[texture_path] = cache_texture(texture_path, texture_folder, document_path, assets)
-                    except FileNotFoundError as error:
-                        cached[texture_path] = None
-                        warnings.append(str(error) + '; using the face color.')
-                if cached[texture_path] is not None:
-                    diffuse_map = str(cached[texture_path])
-                    # The host's own mesh exporter uses white for textured faces.
-                    color = '#FFFFFF'
-            mat_name = attrs.get('mat') or ('Default White' if not attrs.get('color') and not diffuse_map
-                                            else 'Color ' + color)
-            key = (mat_name,color,diffuse_map)
-            mid = material_ids.get(key)
-            if mid is None:
-                identity = json.dumps([mat_name, color, Path(diffuse_map).name if diffuse_map else ''], sort_keys=True)
-                mid = material_ids[key] = hashlib.sha256(identity.encode('utf8')).hexdigest()[:24]
-                materials[mid] = {'id': mid, 'name': mat_name, 'color': color,
-                                  'metallic': 0.0, 'specular': 0.5, 'roughness': 0.5}
-                if diffuse_map:
-                    materials[mid]['diffuse_map'] = diffuse_map
-            part = parts.get(mid)
-            if part is None:
-                part = parts[mid] = {'id': path + '/' + mid, 'name': name,
-                                     'vertices': [], 'triangles': [],
-                                     'uvs': [], 'normals': [],
-                                     'material_id': mid, 'transform': transform}
-            smooth = smoother.corners(face)
-            flat = smoother.flat(face)
-            for tri in export_triangles(face):
-                start = len(part['vertices'])
-                part['vertices'].extend([[float(p.x()), float(p.y()), float(p.z())] for p in tri])
-                part['normals'].extend([list(smooth.get(p.toTuple(), flat).toTuple()) for p in tri])
-                if diffuse_map:
-                    uvw = texture.get('uvw')
-                    uv = affine_uv(uvw, tri) if uvw else planar_uv(
-                        face.normal(), tri, texture.get('sw', 1.0) or 1.0,
-                        texture.get('sh', 1.0) or 1.0, float(texture.get('rot', 0.0)))
-                    part['uvs'].extend([[float(u), float(v)] for u, v in uv])
-                else:
-                    part['uvs'].extend([[0.0, 0.0] for _ in tri])
-                part['triangles'].append([start, start+1, start+2])
+            front = effective_attrs(face.attrs, paint) or {}
+            back = front.get('back')
+            sides = [(front, False)]
+            if isinstance(back, dict):
+                sides.append((back, True))
+            elif back is True:
+                sides.append((front, True))
+            for attrs, reverse in sides:
+                rgb = tuple(attrs.get('color') or (1.0, 1.0, 1.0))[:3]
+                color = colors.get(rgb)
+                if color is None:
+                    color = '#' + ''.join('%02X' % max(0, min(255, round(float(c)*255))) for c in rgb)
+                    colors[rgb] = color
+                texture = attrs.get('texture') or {}
+                texture_path = texture.get('path')
+                diffuse_map = None
+                if texture_path:
+                    if not document_path or texture_folder is None:
+                        raise ValueError('Save the model and connect Twinmotion Sync before sending textures.')
+                    if texture_path not in cached:
+                        try:
+                            cached[texture_path] = cache_texture(texture_path, texture_folder, document_path, assets)
+                        except FileNotFoundError as error:
+                            cached[texture_path] = None
+                            warnings.append(str(error) + '; using the face color.')
+                    if cached[texture_path] is not None:
+                        diffuse_map = str(cached[texture_path])
+                        # The host's own mesh exporter uses white for textured faces.
+                        color = '#FFFFFF'
+                mat_name = attrs.get('mat') or ('Default White' if not attrs.get('color') and not diffuse_map
+                                                else 'Color ' + color)
+                key = (mat_name,color,diffuse_map)
+                mid = material_ids.get(key)
+                if mid is None:
+                    identity = json.dumps([mat_name, color, Path(diffuse_map).name if diffuse_map else ''], sort_keys=True)
+                    mid = material_ids[key] = hashlib.sha256(identity.encode('utf8')).hexdigest()[:24]
+                    materials[mid] = {'id': mid, 'name': mat_name, 'color': color,
+                                      'metallic': 0.0, 'specular': 0.5, 'roughness': 0.5}
+                    if diffuse_map:
+                        materials[mid]['diffuse_map'] = diffuse_map
+                part = parts.get(mid)
+                if part is None:
+                    part = parts[mid] = {'id': path + '/' + mid, 'name': name,
+                                         'vertices': [], 'triangles': [],
+                                         'uvs': [], 'normals': [],
+                                         'material_id': mid, 'transform': transform}
+                smooth = smoother.corners(face)
+                flat = smoother.flat(face)
+                for tri in export_triangles(face):
+                    if reverse:
+                        tri = tuple(reversed(tri))
+                    start = len(part['vertices'])
+                    part['vertices'].extend([[float(p.x()), float(p.y()), float(p.z())] for p in tri])
+                    part['normals'].extend([[(-1.0 if reverse else 1.0) * float(v)
+                                          for v in smooth.get(p.toTuple(), flat).toTuple()] for p in tri])
+                    if diffuse_map:
+                        uvw = texture.get('uvw')
+                        uv = affine_uv(uvw, tri) if uvw else planar_uv(
+                            face.normal(), tri, texture.get('sw', 1.0) or 1.0,
+                            texture.get('sh', 1.0) or 1.0, float(texture.get('rot', 0.0)))
+                        part['uvs'].extend([[float(u), float(v)] for u, v in uv])
+                    else:
+                        part['uvs'].extend([[0.0, 0.0] for _ in tri])
+                    part['triangles'].append([start, start+1, start+2])
         objects.extend(part for part in parts.values() if part['triangles'])
 
     def group_parts(group, parent, path, top_paint):

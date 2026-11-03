@@ -88,6 +88,8 @@ disconnects the source; reconnect for the new model location. Turn off the
 Camera button to pause publication. Release Twinmotion's DCC Camera Sync mode
 for independent navigation there.
 
+Explicit back-side colors and diffuse textures are exported with reversed geometry. Receiver appearance has not yet been visually verified.
+
 Known gaps include glass/transparency and other PBR maps, orthographic and
 two-point/off-center camera views, face-me figures, receiver roll behavior,
 large-model capture pauses and full-house rendered visual acceptance. Worker
