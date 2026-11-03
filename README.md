@@ -14,6 +14,13 @@ at about 28 updates/s. It is not yet as smooth as our D5 connector. The optional
 60 Hz source sampling mode did not improve that receiver rate. See
 [validation and limitations](docs/VALIDATION.md).
 
+## Material sync example
+
+The tennis court in IngeTrazo (left) and Twinmotion (right), showing its green
+surfaces and court lines in both applications.
+
+![Tennis court in IngeTrazo and Twinmotion](docs/images/ingetrazo-twinmotion-court.png)
+
 ## Have Codex or OpenCode install it
 
 Give a local Codex or OpenCode session this repository link and this request:
